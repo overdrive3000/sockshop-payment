@@ -5,7 +5,7 @@ services:
         build: 
             context: .
             dockerfile: docker/payment/Dockerfile
-        image: weaveworksdemos/payment
+        image: overdrive3000/payment
         hostname: payment
         restart: always
         cap_drop:

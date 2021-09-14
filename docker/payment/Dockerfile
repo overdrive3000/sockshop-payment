@@ -1,29 +1,22 @@
-FROM golang:1.7
+FROM golang:1.16-buster AS build
 
-COPY . /go/src/github.com/microservices-demo/payment/
+WORKDIR /app
+COPY go.mod ./
+COPY go.sum ./
+RUN go env -w GOPROXY=direct && go mod download
+COPY . .
 
-RUN go get -u github.com/FiloSottile/gvt
-RUN cd /go/src/github.com/microservices-demo/payment/ && gvt restore
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /payment cmd/paymentsvc/main.go
+RUN chmod +x /payment && chown 65534:65534 /payment && \
+        setcap CAP_NET_BIND_SERVICE=+eip /payment
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app github.com/microservices-demo/payment/cmd/paymentsvc
-
-FROM alpine:3.4
+FROM debian:11
 
 WORKDIR /
-COPY --from=0 /app /app
+COPY --from=build /payment /payment
 
-ENV	SERVICE_USER=myuser \
-	SERVICE_UID=10001 \
-	SERVICE_GROUP=mygroup \
-	SERVICE_GID=10001
+USER 65534
 
-RUN	addgroup -g ${SERVICE_GID} ${SERVICE_GROUP} && \
-	adduser -g "${SERVICE_NAME} user" -D -H -G ${SERVICE_GROUP} -s /sbin/nologin -u ${SERVICE_UID} ${SERVICE_USER} && \
-	chmod +x /app && \
-    chown -R ${SERVICE_USER}:${SERVICE_GROUP} /app
-
-USER ${SERVICE_USER}
-
-CMD ["/app", "-port=8080"]
+CMD ["/payment", "-port=8080"]
 
 EXPOSE 8080
